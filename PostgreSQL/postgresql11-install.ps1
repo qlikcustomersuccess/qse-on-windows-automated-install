@@ -39,9 +39,11 @@ choco install pgadmin4 --yes
 # Configure PGPASSWORD to allow usage of PSQL.EXE
 [System.Environment]::SetEnvironmentVariable("PGPASSWORD", "$pg_super_pwd", [System.EnvironmentVariableTarget]::User)
 
+Set-Location -Path "$env:ProgramFiles\PostgreSQL\11\bin"
+
 # Create databases and configure roles
 # https://help.qlik.com/en-US/sense-admin/April2020/Subsystems/DeployAdministerQSE/Content/Sense_DeployAdminister/QSEoW/Deploy_QSEoW/Installing-configuring-postgresql.htm
-psql.exe --username=postgres --host localhost --port=5432 --no-password --echo-errors --echo-queries `
+.\psql.exe --username=postgres --host localhost --port=5432 --no-password --echo-errors --echo-queries `
          --command 'CREATE DATABASE "QSR" ENCODING = "UTF8";' `
          --command 'CREATE DATABASE "SenseServices" ENCODING = "UTF8";' `
          --command 'CREATE DATABASE "QSMQ" ENCODING = "UTF8";' `
@@ -71,5 +73,7 @@ psql.exe --username=postgres --host localhost --port=5432 --no-password --echo-e
          --command 'GRANT "qlogs_users" TO "qlogs_reader";' `
          --command 'GRANT "qlogs_users" TO "qlogs_writer";' `
          --command 'ALTER DATABASE "QLogs" OWNER TO "qlogs_writer"; ' 
+
+Set-Location -Path "$ScriptLocation"
 
 Stop-Transcript
