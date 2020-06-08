@@ -1,2 +1,6 @@
+# All folders and files with name starting with dot
+.*
+
+# Log and config files
+*.conf
 *.log
-*.*sql
