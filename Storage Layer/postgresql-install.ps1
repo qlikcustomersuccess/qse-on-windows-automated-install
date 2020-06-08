@@ -42,6 +42,10 @@ param (
     [Parameter()]
     [ValidateSet("postgresql9", "postgresql11")]
     [string] $Release = "postgresql11", 
+    [Parameter()]
+    [Int] $QlikSenseNodes = 1,
+    [Parameter()]
+    [Int] $Port = 5432,
     [Parameter(Mandatory=$false)]
     [Switch] $DummyPassword
 )
@@ -132,16 +136,28 @@ Set-Location -Path "$PostgresInstallPath\bin"
             --command 'GRANT "qlogs_users" TO "qlogs_writer";' `
             --command 'ALTER DATABASE "QLogs" OWNER TO "qlogs_writer"; ' 
 
-Set-Location -Path "$PSScriptRoot"
-
-# Generate PostgreSQL config files
-Invoke-Expression -Command """$PSScriptRoot\postgresql.conf.ps1 -NoOfNodes 4"""
-Invoke-Expression -Command """$PSScriptRoot\pg_hba.conf.ps1"""
+# Generate config files
+# TBD: Separate config files for different releases?
+Invoke-Expression "@`"`r`n$(Get-Content "$PSScriptRoot\pg_hba11.tmp.conf" -Raw)`r`n`"@"     | Out-File -FilePath "$PSScriptRoot\pg_hba.conf"
+Invoke-Expression "@`"`r`n$(Get-Content "$PSScriptRoot\postgresql11.tmp.conf" -Raw)`r`n`"@" | Out-File -FilePath "$PSScriptRoot\postgresql.conf"
 
 # Replace PostgreSQL config files
-Move-Item -Path "$PostgresInstallPath\data\postgresql.conf" -Destination "$PostgresInstallPath\data\postgresql.conf.orig" -Force
-Move-Item -Path "$PostgresInstallPath\data\pg_hba.conf"     -Destination "$PostgresInstallPath\data\pg_hba.conf.orig"     -Force
+# Make safe copy if not already exists
+if (-Not [System.IO.File]::Exists("$PostgresInstallPath\data\postgresql.conf.orig")) {
+    Copy-Item -Path "$PostgresInstallPath\data\postgresql.conf" -Destination "$PostgresInstallPath\data\postgresql.conf.orig" -Force
+}
+if (-Not [System.IO.File]::Exists("$PostgresInstallPath\data\pg_hba.conf.orig")) {
+    Copy-Item -Path "$PostgresInstallPath\data\pg_hba.conf"     -Destination "$PostgresInstallPath\data\pg_hba.conf.orig" -Force
+}    
+
+# Stop PostgreSQL server
+.\pg_ctl.exe -D "$PostgresInstallPath\data" stop
+
+# Copy new config files
 Copy-Item -Path "$PSScriptRoot\postgresql.conf" -Destination "$PostgresInstallPath\data\postgresql.conf" -Force
 Copy-Item -Path "$PSScriptRoot\pg_hba.conf"     -Destination "$PostgresInstallPath\data\pg_hba.conf"     -Force
+
+# Start PostgreSQL server
+.\pg_ctl.exe -D "$PostgresInstallPath\data" start
 
 Stop-Transcript
