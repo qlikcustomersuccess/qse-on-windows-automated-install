@@ -4,3 +4,6 @@
 # Log and config files
 *.conf
 *.log
+
+# Exclude template files
+!*.tmp.*
