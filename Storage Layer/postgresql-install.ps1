@@ -44,6 +44,8 @@ param (
     [string] $Release = "postgresql11", 
     [Parameter()]
     [Int] $QlikSenseNodes = 1,
+    # [Parameter(Mandatory=$true)]
+    # [string[]] $NodeNames,
     [Parameter()]
     [Int] $Port = 5432,
     [Parameter(Mandatory=$false)]
@@ -62,8 +64,8 @@ $path_pg_user_pwd   = "$path_secrets\.pg_user_pwd"
 # Log script execution to trace/log file
 Start-Transcript -Path "$path_logs\$(split-path $PSCommandPath -Leaf)_$(get-date -format "yyyyddMM_HHmmss").log" -NoClobber
 
-# Invoke Chcolatey installation 
-Invoke-Expression -Command """$PSScriptRoot\..\Chocolatey\install-package-mngr.ps1"""
+# Invoke Chocolatey installation 
+. "$PSScriptRoot\..\Chocolatey\install-package-mngr.ps1"
 
 # Create secrets folder
 New-Item -Type Directory -Path "$path_secrets" -Force
