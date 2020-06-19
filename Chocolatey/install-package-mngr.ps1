@@ -1,5 +1,7 @@
 #Requires -Version 5.0 -RunAsAdministrator
 
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
 try {
 
     # Attempt Chocolatey upgrade
@@ -11,9 +13,7 @@ try {
     # Install Chocolatey Package manager
     # Reference: https://chocolatey.org/install
 
-    Set-ExecutionPolicy Bypass -Scope Process -Force
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
     Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')
 
 }
-
