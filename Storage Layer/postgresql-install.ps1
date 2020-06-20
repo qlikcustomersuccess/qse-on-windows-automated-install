@@ -117,9 +117,9 @@ $env:PGDATA     = [System.Environment]::GetEnvironmentVariable("PGDATA","User")
 
 # Create databases and configure roles
 # https://help.qlik.com/en-US/sense-admin/April2020/Subsystems/DeployAdministerQSE/Content/Sense_DeployAdminister/QSEoW/Deploy_QSEoW/Installing-configuring-postgresql.htm
-
+Set-Location -Path "$PostgreSqlBin"
 try {
-    $PostgreSqlBin\psql.exe --username=postgres --host localhost --port=5432 --no-password --echo-errors --echo-queries `
+    & "$PostgreSqlBin\psql.exe" --username=postgres --host localhost --port=5432 --no-password --echo-errors --echo-queries `
                             --command 'CREATE DATABASE "QSR" ENCODING = "UTF8";' `
                             --command 'CREATE DATABASE "SenseServices" ENCODING = "UTF8";' `
                             --command 'CREATE DATABASE "QSMQ" ENCODING = "UTF8";' `
@@ -156,8 +156,8 @@ try {
 
 # Generate config files
 # Must replace linebreak with \r\n, otherwise PostgreSQL fails to read
-Invoke-Expression "@`"`r`n$(Get-Content "$PSScriptRoot\pg_hba11.tmp.conf" -Raw)`r`n`"@"     | Out-File -FilePath "$PSScriptRoot\pg_hba.conf" -Encoding ASCII
-Invoke-Expression "@`"`r`n$(Get-Content "$PSScriptRoot\postgresql11.tmp.conf" -Raw)`r`n`"@" | Out-File -FilePath "$PSScriptRoot\postgresql.conf" -Encoding ASCII
+Invoke-Expression "@`"`r`n$((Get-Content "$PSScriptRoot\pg_hba11.tmp.conf" -Raw).Replace("`n", "`r`n"))`r`n`"@"     | Out-File -FilePath "$PSScriptRoot\pg_hba.conf" -Encoding ASCII
+Invoke-Expression "@`"`r`n$((Get-Content "$PSScriptRoot\postgresql11.tmp.conf" -Raw).Replace("`n", "`r`n"))`r`n`"@" | Out-File -FilePath "$PSScriptRoot\postgresql.conf" -Encoding ASCII
 
 # Safe copies of PostgreSQL config files, unless already exist
 if (-Not [System.IO.File]::Exists("$PostgreSqlData\postgresql.conf.orig")) {
@@ -169,7 +169,7 @@ if (-Not [System.IO.File]::Exists("$PostgreSqlData\pg_hba.conf.orig")) {
 
 # Stop PostgreSQL server
 try {
-    $PostgreSqlBin\pg_ctl.exe stop
+    Get-Service | Where-Object { $_.Name -like "postgresql*" } | Stop-Service
     Write-Host "PostgreSQL has been stopped." -ForegroundColor Green
 } catch {
     Write-Host "PostgreSQL can not be stopped. It may already be stopped." -ForegroundColor Magenta
@@ -181,7 +181,7 @@ Copy-Item -Path "$PSScriptRoot\pg_hba.conf"     -Destination "$PostgreSqlData\pg
 
 # Start PostgreSQL server
 try {
-    $PostgreSqlBin\pg_ctl.exe start
+    Get-Service | Where-Object { $_.Name -like "postgresql*" } | Start-Service    
     Write-Host "PostgreSQL has started." -ForegroundColor Green
 } catch {
     Write-Host "PostgreSQL can not be started. Config files may be incorrect." -ForegroundColor Magenta
