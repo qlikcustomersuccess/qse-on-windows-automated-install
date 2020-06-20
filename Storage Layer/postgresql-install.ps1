@@ -5,43 +5,69 @@
     Automated install of PostgreSQL database server for use as Qlik Sense Repository database
 
     .DESCRIPTION
-    Automated siltent installation of PostgreSQL databse server on Windows Server. 
-    Utilize Chocolately package manager to install PostgreSQL server in Windows environement. Setup databases and roles as required for Qlik Sense Enterprise on Windows.     
+    PostgreSQL database server is installed on Windows server. Internet access and Local Administrator 
+    right are required for the executing user, as Chocolately package manager is utilized to download 
+    and install PostgreSQL server and PgAdmin. 
+
+    After installation databases and roles are configured to match Qlik Sense Enterprise requirements. 
+    Additionally, custom PostgreSQL config files are generated, so that database server can be accessed 
+    by all Qlik Sense nodes and manage the expected workload. 
+
+    Custom configuration is controlled through template files pg_hba11.tmp.conf and postgresql11.tmp.conf, 
+    which are invoked as expressions during execution to generated variable controlled content. 
+
+    Database passwords are generated during installation. One password is created for the database server 
+    super user (postgres), and one password is created for the database users. The passwords are stored in 
+    .secrets folder in the files .pg_super_pwd and .pg_user_pwd. 
+    Custom passwords can be applied by addind .pg_super_pwd and .pg_user_pwd plain text password files to 
+    .secrets folder prior to executing installation. 
+    For test instances in isolated environments, -DummyPassword flag enables simple generation of a 
+    generic dummy password. 
 
     .PARAMETER  DummyPassword
-    Flag if dummy password Password123! should be forced to database super user and Qlik Sense databse users. By default random passwords are generated and shared in .secrets folder.
+    Flag to genrated dummy password (Password123!) for both super user and database users. 
+    By default random passwords are generated.
+
+    .PARAMETER  NoPgAdmin
+    Flag to skip installation of PgAdmin. 
+    By default PgAdmin is installed.
 
     .PARAMETER Port
-    Listening port for PostgreSQL databse server. 
+    Listening port for PostgreSQL database server. 
     Default 5432.
 
     .PARAMETER  QlikSenseNodes
-    Number of Qlik Sense nodes that will connect ot PostgreSQL databse sevrer. This value is used to adjust PostgreSQL configuration to fit the expected connection volume. 
+    Number of Qlik Sense nodes that will connect to PostgreSQL database server instance. This value is 
+    used to adjust PostgreSQL configuration to fit the expected connection volume. 
     Default value is 1.
 
     .PARAMETER  Release
-    Defines the PostgreSQL major version to be installed. Value is defined as the Chocolatey package names postgresql9 or postgresql11. 
+    Defines the PostgreSQL major version to be installed. Currently supported values match version 
+    supported by Qlik Sense on Windows as repository database. Parameter value is defined as the Chocolatey 
+    package names postgresql9 or postgresql11. The actually installed version will be the latest minpr 
+    version available through Chocolatey. 
     Default value is postgresql11.
 
     .EXAMPLE
     C:\PS> .\postgresql-install.ps1
-    Installs PostgreSQL 11.x server with Qlik Sense databases. Superuser password and and database user password are random. 
+    Installs PostgreSQL 11.x server listening on port 5432. User passwords are random. 
 
     .EXAMPLE
     C:\PS> .\postgresql-install.ps1 -DummyPassword
-    Installs PostgreSQL 11.x server with Qlik Sense databases. Superuser password and and database user password are are forced to Password123!. 
+    Installs PostgreSQL 11.x server listening on port 5432. User passwords are set to Password123!
 
     .EXAMPLE
     C:\PS> .\postgresql-install.ps1 -release "postgresql9"
-    Installs PostgreSQL 9.6.x server with Qlik Sense databases. Superuser password and and database user password are random. 
+    Installs PostgreSQL 9.6.x server listening on port 5432. User passwords are random. 
 
     .EXAMPLE
     C:\PS> .\postgresql-install.ps1 -release "postgresql9" -DummyPassword
-    Installs PostgreSQL 9.6.x server with Qlik Sense databases. Superuser password and and database user password are are forced to Password123!. 
+    Installs PostgreSQL 9.6.x server listening on port 5432. User passwords are set to Password123!
 
     .EXAMPLE
     C:\PS> .\postgresql-install.ps1 -QlikSenseNodes 4 -DummyPassword
-    Installs PostgreSQL 11.x server with Qlik Sense databases. Superuser password and and database user password are are forced to Password123!. Databse is preconfigured to be used by 4 Qlik Sense nodes in a multi node deployment. 
+    Installs PostgreSQL 11.x server listening on port 5432. User passwords are set to Password123!
+    PostgreSQL configuration is adjusted for multi-node deployment, with 4 Qlik Sense nodes. 
 
     .NOTES
     Copyright (c) 2020. This script is provided "AS IS", without any warranty, under the MIT License.     
@@ -53,12 +79,12 @@ param (
     [string] $Release = "postgresql11", 
     [Parameter()]
     [Int] $QlikSenseNodes = 1,
-    # [Parameter(Mandatory=$true)]
-    # [string[]] $NodeNames,
     [Parameter()]
     [Int] $Port = 5432,
     [Parameter(Mandatory=$false)]
-    [Switch] $DummyPassword
+    [Switch] $DummyPassword,
+    [Parameter(Mandatory=$false)]
+    [Switch] $NoPgAdmin
 )
 
 # Break on any error
@@ -106,7 +132,9 @@ $pg_user_pwd  = Get-Content -Path "$path_pg_user_pwd" -TotalCount 1
 
 # Install PostgreSQL and PGAdmin through Chocolatey
 choco install $Release --package-parameters "/Password:$pg_super_pwd" --yes
-choco install pgadmin4 --yes
+If(!$NoPgAdmin) {
+    choco install pgadmin4 --yes
+}    
 
 # Configure PostgreSQL environment variables 
 # Refresh variable in current temrinal session
@@ -117,7 +145,7 @@ $env:PGDATA     = [System.Environment]::GetEnvironmentVariable("PGDATA","User")
 
 # Create databases and configure roles
 # https://help.qlik.com/en-US/sense-admin/April2020/Subsystems/DeployAdministerQSE/Content/Sense_DeployAdminister/QSEoW/Deploy_QSEoW/Installing-configuring-postgresql.htm
-Set-Location -Path "$PostgreSqlBin"
+
 try {
     & "$PostgreSqlBin\psql.exe" --username=postgres --host localhost --port=5432 --no-password --echo-errors --echo-queries `
                             --command 'CREATE DATABASE "QSR" ENCODING = "UTF8";' `
@@ -154,10 +182,13 @@ try {
     Write-Host "PostgreSQL content creation could not be finished. It may already exist." -ForegroundColor Magenta
 }
 
-# Generate config files
-# Must replace linebreak with \r\n, otherwise PostgreSQL fails to read
-Invoke-Expression "@`"`r`n$((Get-Content "$PSScriptRoot\pg_hba11.tmp.conf" -Raw).Replace("`n", "`r`n"))`r`n`"@"     | Out-File -FilePath "$PSScriptRoot\pg_hba.conf" -Encoding ASCII
-Invoke-Expression "@`"`r`n$((Get-Content "$PSScriptRoot\postgresql11.tmp.conf" -Raw).Replace("`n", "`r`n"))`r`n`"@" | Out-File -FilePath "$PSScriptRoot\postgresql.conf" -Encoding ASCII
+# Stop PostgreSQL server
+try {
+    Get-Service | Where-Object { $_.Name -like "postgresql*" } | Stop-Service
+    Write-Host "PostgreSQL has been stopped." -ForegroundColor Green
+} catch {
+    Write-Host "PostgreSQL can not be stopped. It may already be stopped." -ForegroundColor Magenta
+}
 
 # Safe copies of PostgreSQL config files, unless already exist
 if (-Not [System.IO.File]::Exists("$PostgreSqlData\postgresql.conf.orig")) {
@@ -167,17 +198,14 @@ if (-Not [System.IO.File]::Exists("$PostgreSqlData\pg_hba.conf.orig")) {
     Copy-Item -Path "$PostgreSqlData\pg_hba.conf"     -Destination "$PostgreSqlData\pg_hba.conf.orig" -Force
 }    
 
-# Stop PostgreSQL server
-try {
-    Get-Service | Where-Object { $_.Name -like "postgresql*" } | Stop-Service
-    Write-Host "PostgreSQL has been stopped." -ForegroundColor Green
-} catch {
-    Write-Host "PostgreSQL can not be stopped. It may already be stopped." -ForegroundColor Magenta
-}
 
-# Copy new config files
-Copy-Item -Path "$PSScriptRoot\postgresql.conf" -Destination "$PostgreSqlData\postgresql.conf" -Force
-Copy-Item -Path "$PSScriptRoot\pg_hba.conf"     -Destination "$PostgreSqlData\pg_hba.conf"     -Force
+# Generate config files from templates, and store to PostgreSQL data folder
+# Replace linebreask, to make readable in Notepad
+Invoke-Expression "@`"`r`n$((Get-Content "$PSScriptRoot\pg_hba11.tmp.conf" -Raw).Replace("`n", "`r`n"))`r`n`"@" | `
+Out-File -FilePath "$PostgreSqlData\pg_hba.conf" -Encoding ASCII -Force
+
+Invoke-Expression "@`"`r`n$((Get-Content "$PSScriptRoot\postgresql11.tmp.conf" -Raw).Replace("`n", "`r`n"))`r`n`"@" | `
+Out-File -FilePath "$PostgreSqlData\postgresql.conf" -Encoding ASCII -Force
 
 # Start PostgreSQL server
 try {

@@ -14,11 +14,12 @@ ForEach-Object { choco uninstall $_ --yes }
 
 # Clear password variable
 [System.Environment]::SetEnvironmentVariable("PGPASSWORD", $null, [System.EnvironmentVariableTarget]::User)
+[System.Environment]::SetEnvironmentVariable("PGDATA", $null, [System.EnvironmentVariableTarget]::User)
 
 # Remove all listed files, if they exist
 # PAssword files, DB config files, etc.
 @("..\.secrets\.pg_super_pwd", `
-  "..\.secrets\.pg_super_pwd", `
+  "..\.secrets\.pg_user_pwd", `
   "postgresql.conf", `
   "pg_hba.conf" ) | `
 ForEach-Object { 
