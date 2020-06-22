@@ -90,11 +90,17 @@ param (
 # Break on any error
 $ErrorActionPreference = "Stop"
 
-# Define locations
-$path_logs          = "$PSScriptRoot\..\.logs"
-$path_secrets       = "$PSScriptRoot\..\.secrets"
-$path_pg_super_pwd  = "$path_secrets\.pg_super_pwd"
-$path_pg_user_pwd   = "$path_secrets\.pg_user_pwd"
+# Common folder paths
+$path_logs    = "$PSScriptRoot\..\.logs"
+$path_secrets = "$PSScriptRoot\..\.secrets"
+
+# Create folders if missing
+if(-Not (Test-Path "$path_logs"))    { New-Item -Type Directory -Path "$path_logs" -Force    }
+if(-Not (Test-Path "$path_secrets")) { New-Item -Type Directory -Path "$path_secrets" -Force }  
+
+# Common file paths
+$path_pg_super_pwd = "$path_secrets\.pg_super_pwd"
+$path_pg_user_pwd  = "$path_secrets\.pg_user_pwd"
 
 if($Release -eq "postgresql11") { 
     $PostgresInstallPath = "$env:ProgramFiles\PostgreSQL\11"  
@@ -107,8 +113,8 @@ $PostgreSqlBin  = "$PostgresInstallPath\bin"
 # Log script execution to trace/log file
 Start-Transcript -Path "$path_logs\$(split-path $PSCommandPath -Leaf)_$(get-date -format "yyyyddMM_HHmmss").log" -NoClobber
 
-# Include Chocolatey installation script
-. "$PSScriptRoot\..\Chocolatey\install-package-mngr.ps1"
+# Install Chocolatey based on Gist snippet
+. "https://gist.githubusercontent.com/tonikautto/66b6913fc476ef77ea8b452a0936e7a6/raw/5fb744f41a230efde45b0567516dfc2ead5a7e27/chocolatey-install.ps1"
 
 # Create secrets folder
 New-Item -Type Directory -Path "$path_secrets" -Force
