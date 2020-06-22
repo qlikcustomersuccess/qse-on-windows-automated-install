@@ -6,7 +6,7 @@ param (
     [Parameter()]
     [string] $Share = "QlikShare",
     [Parameter(Mandatory)]
-    [String] $QlikSA 
+    [String] $QlikSA  
 )
 
 # Include paths
