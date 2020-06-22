@@ -1,7 +1,10 @@
 #Requires -Version 5.0 -RunAsAdministrator
 
+# Include paths
+. "$PSScriptRoot\..\helpers\common-paths.ps1"
+
 # Log script execution to trace/log file
-Start-Transcript -Path "$PSScriptRoot\..\.logs\$(split-path $PSCommandPath -Leaf)_$(get-date -format "yyyyddMM_HHmmss").log" -NoClobber
+Start-Transcript -Path "$path_logs\$(split-path $PSCommandPath -Leaf)_$(get-date -format "yyyyddMM_HHmmss").log" -NoClobber
 
 # Uninstall related choco packages, based on package names
 # Only invoke uninstall on currently installed packages
@@ -18,10 +21,8 @@ ForEach-Object { choco uninstall $_ --yes }
 
 # Remove all listed files, if they exist
 # PAssword files, DB config files, etc.
-@("..\.secrets\.pg_super_pwd", `
-  "..\.secrets\.pg_user_pwd", `
-  "postgresql.conf", `
-  "pg_hba.conf" ) | `
+@("$path_secrets\.pg_super_pwd", `
+  "$path_secrets\.pg_user_pwd") | `
 ForEach-Object { 
     if([System.IO.File]::Exists("$PSScriptRoot\$_")) { 
         Write-Host "Removing $PSScriptRoot\$_" -ForegroundColor Green
