@@ -1,75 +1,68 @@
 #Requires -Version 5.0 -RunAsAdministrator
 
+<#
+    .SYNOPSIS
+    Automated install of SMB file share for Qlik Sense persistance storage
+
+    .DESCRIPTION
+
+    .PARAMETER Path
+    Local folder path on server to share folder.  
+    Default path is c:\qlik-share\
+
+    .PARAMETER  Share
+    Name of SMB file share.
+    Default value is QlikShare
+
+    .PARAMETER  ServiceAccount
+    Domain user account that runs Qlik Sense services, definde in format DOAMIN\USER. 
+    This user will be granted full access to SMB file share to enable Qlik Sense to 
+    both read and write files. 
+    No default value, must be defined at script call. 
+
+    .EXAMPLE
+    C:\PS> .\smb-fileshare-create.ps1 -ServiceAccount DOMAIN\QlikService
+
+    Folder c:\qlik-sahre is shared as SMB share QlikShare to DOMAIN\Service
+
+    .NOTES
+    Copyright (c) 2020. This script is provided "AS IS", without any warranty, under the MIT License.     
+#>
+
 param (
     [Parameter()]
     [string] $Path = "c:\qlik-share\",
     [Parameter()]
     [string] $Share = "QlikShare",
-    [Parameter(Mandatory)]
-    [String] $QlikSA  
+    [Parameter(Mandatory=$true)]
+    [String] $ServiceAccount  
 )
-
-# Include paths
-. "..\helpers\common-paths.ps1"
-
-# Common folder paths
-$path_logs    = "$PSScriptRoot\..\.logs"
-
-# Create folders if missing
-if(-Not (Test-Path "$path_logs"))    { New-Item -Type Directory -Path "$path_logs" -Force    }
-
-# Log script execution to trace/log file
-Start-Transcript -Path "$path_logs\$(split-path $PSCommandPath -Leaf)_$(get-date -format "yyyyddMM_HHmmss").log" -NoClobber
 
 # Break on any error
 $ErrorActionPreference = "Stop"
 
+# Common folder paths
+$path_logs    = "$PSScriptRoot\..\.logs"
+
+# Log script execution to trace/log file
+Start-Transcript -Path "$path_logs\$(split-path $PSCommandPath -Leaf)_$(get-date -format "yyyyddMM_HHmmss").log" -NoClobber | Out-Null
+
 # Validate user name format
-if ($QlikSA -cnotmatch '^[a-zA-Z][a-zA-Z0-9‌​\-\.]{0,61}[a-zA-Z]\\\w[\w\.\- ]*$') {
-    throw "ERROR: QlikSA parameter value '$QlikSA' not in valid DOMAIN\USER format"
+if ($ServiceAccount -cnotmatch '^[a-zA-Z][a-zA-Z0-9‌​\-\.]{0,61}[a-zA-Z]\\\w[\w\.\- ]*$') {
+    throw "ERROR: ServiceAccount parameter value '$ServiceAccount' not in valid DOMAIN\USER format"
 }
 
-# Split SA user and domain
-$SADomain = $QlikSA.Split("\")[0]
-$SAUser   = $QlikSA.Split("\")[1]
+#Create folder if not already exist
+New-Item -Path "$Path" -Type Directory -Force | Out-Null
 
-# Import and add AD module if needed
-if (-Not (Get-Module -ListAvailable -Name ServerManager)) {
-    Import-Module ServerManager
-}
-Add-WindowsFeature -Name "RSAT-AD-PowerShell" –IncludeAllSubFeature
+# Create new SMB share
+# Expected to fail if same name share already exists
+try {    
+    New-SmbShare -Path "$Path" -Name "$Share" -fullaccess "$env:userdomain\$env:username" | Out-Null
+} catch {}
+Grant-SmbShareAccess -Name "$Share" -AccountName "$ServiceAccount" -AccessRight Full -Force | Out-Null
 
-# Validate SA account as valid domain user
-$QlikSA_UserPrincipalName = (Get-ADUser -Filter "Name -like ""$SAUser""").UserPrincipalName
-if($null -eq $QlikSA_UserPrincipalName) {
-    throw "ERROR: $SADomain\$SAUser not in valid user in domain $env:UserDnsDomain"
-} 
+# Return Share URI
+Write-Output "\\$env:COMPUTERNAME.$env:UserDnsDomain\$Share"
 
-# Add SA to local admin group
-try {
-    Add-LocalGroupMember -Group "Administrators" -Member "$QlikSA_UserPrincipalName"
-} catch {
-    Write-Host "$QlikSA_UserPrincipalName already exists in local administrator"
-}
-
-# Create folder if not already exist
-if (-Not (Test-Path -Path "$Path")) {
-    New-Item -Path "$Path" -Type Directory -Force
-}
-
-#    Grant-SmbShareAccess -Name "$Share" -AccountName "$env:userdomain\$env:username" -AccessRight Full -Force
-if($null -eq (Get-SmbShare -Name "$Share")) { 
-    New-SmbShare -Path "$Path" -Name "$Share" -fullaccess "$QlikSA_UserPrincipalName"
-} else {
-    Write-Host "SMB share $Share already exists" -ForegroundColor Yellow
-}
-
-If( (Get-SmbShareAccess -Name "$Share" | Where-Object { ($_.AccountName -eq "$env:userdomain\$env:username") -or ($_.AccountName -eq "$SADomain\$SAUser") } | Measure-Object).Count -ne 2) {
-    Grant-SmbShareAccess -Name "$Share" -AccountName "$env:userdomain\$env:username" -AccessRight Full -Force
-    Grant-SmbShareAccess -Name "$Share" -AccountName "$SADomain\$SAUser" -AccessRight Full -Force
-}
-
-# Store share path 
-Write-Host "SMB file share has been successfully created;`n\\$env:COMPUTERNAME.$env:UserDnsDomain\$Share" -ForegroundColor Green
-
-Stop-Transcript
+Stop-Transcript | Out-Null
