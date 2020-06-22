@@ -20,6 +20,9 @@
     both read and write files. 
     No default value, must be defined at script call. 
 
+    .OUTPUTS 
+    UNC path to SMB file share
+
     .EXAMPLE
     C:\PS> .\smb-fileshare-create.ps1 -ServiceAccount DOMAIN\QlikService
 
@@ -62,7 +65,7 @@ try {
 } catch {}
 Grant-SmbShareAccess -Name "$Share" -AccountName "$ServiceAccount" -AccessRight Full -Force | Out-Null
 
-# Return Share URI
+# Return UNC path to share
 Write-Output "\\$env:COMPUTERNAME.$env:UserDnsDomain\$Share"
 
 Stop-Transcript | Out-Null

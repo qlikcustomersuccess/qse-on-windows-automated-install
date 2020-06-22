@@ -221,4 +221,9 @@ try {
     Write-Host "PostgreSQL can not be started. Config files may be incorrect." -ForegroundColor Magenta
 }
 
+Write-Host "$Release has been successfully installed on port $Port" -ForegroundColor Green
+Write-Host "and configured for $QlikSenseNodes Qlik Sense node(s)." -ForegroundColor Green
+Write-Host "See password files for super user and database user passwords:" -ForegroundColor Green
+Write-Host "$path_pg_super_pwd `n$path_pg_user_pwd" -ForegroundColor Yellow
+
 Stop-Transcript
